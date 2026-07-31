@@ -1,0 +1,29 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# test / lint caches
+.pytest_cache/
+.ruff_cache/
+
+# generated data (DVC-tracked, not git-tracked)
+data/raw/*.csv
+data/raw/frozen_holdout.parquet
+data/batches/*.parquet
+
+# mlflow local artifacts (real tracking is on DagsHub, not local)
+mlruns/
+
+# streamlit
+.streamlit/secrets.toml
+
+# os / editor
+.DS_Store
+.vscode/
+.idea/

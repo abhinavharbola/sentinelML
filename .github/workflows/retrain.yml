@@ -1,0 +1,38 @@
+name: Retrain
+
+on:
+  repository_dispatch:
+    types: [retrain]
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Configure DVC remote credentials
+        run: |
+          dvc remote modify origin --local access_key_id ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_TOKEN }}
+
+      - name: Pull DVC-tracked data
+        run: dvc pull
+
+      - name: Train challenger
+        id: train
+        run: python src/train.py
+
+      - name: Evaluate and promote
+        run: python src/promote.py promote --challenger-version ${{ steps.train.outputs.challenger_version }}

@@ -1,0 +1,54 @@
+name: Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    # best-effort daily tick; GitHub Actions cron is not guaranteed to fire on time,
+    # so this is a convenience trigger, not the source of truth for the simulated clock.
+    # Use workflow_dispatch for reliable, on-demand demo runs.
+    - cron: "0 * * * *"
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+      API_URL: ${{ secrets.API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Advance simulated day
+        run: python scripts/advance_day.py
+
+      - name: Replay current day through the API
+        run: python scripts/replay_batch.py
+
+      - name: Release delayed labels
+        run: python src/label_injector.py
+
+      - name: Check drift and performance
+        id: drift
+        run: python src/drift.py
+
+      - name: Check for rollback
+        run: python src/promote.py check-rollback
+
+      - name: Fire retraining workflow
+        if: steps.drift.outputs.retrain_needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -d '{"event_type": "retrain"}'
