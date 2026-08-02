@@ -25,21 +25,21 @@ The [ULB Credit Card Fraud dataset](https://www.kaggle.com/datasets/mlg-ulb/cred
 This is a deliberate simplification, not a hidden shortcut, every drift event is scripted, logged to `data/batches/manifest.json`, and this section exists so it's never mistaken for a claim of real production traffic.
 
 ## Architecture
-
+ 
 ```mermaid
 flowchart LR
     subgraph Simulation
         A[simulate_stream.py] -->|writes| B[(data/batches/*.parquet)]
     end
-
+ 
     subgraph Serving
-        C[replay_batch.py] -->|POST /predict| D[FastAPI serving/main.py]
+        C[replay_batch.py] -->|POST /predict_batch<br/>chunked| D[FastAPI serving/main.py]
         D -->|loads models:/fraud-xgb@production| E[(MLflow Registry - DagsHub)]
         D -->|logs every prediction| F[(Neon: predictions)]
     end
-
+ 
     B --> C
-
+ 
     subgraph Monitoring
         G[label_injector.py] -->|releases true_label after delay| F
         H[drift.py] -->|feature drift| Evidently
@@ -47,7 +47,7 @@ flowchart LR
         H -->|writes drift_check event| J[(Neon: audit_log)]
         H -->|retrain_needed=true| K[repository_dispatch]
     end
-
+ 
     subgraph Retraining
         K --> L[train.py]
         L -->|DVC-versioned data| M[(DagsHub DVC)]
@@ -57,7 +57,7 @@ flowchart LR
         N -->|alias flip or reject| E
         N -->|writes promotion/rollback event| J
     end
-
+ 
     subgraph Dashboard
         O[Streamlit app.py] -->|reads| J
         O -->|on button click only| P[Groq: llm_explain.py]
