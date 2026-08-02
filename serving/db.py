@@ -2,7 +2,14 @@ import json
 import os
 
 import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+
+load_dotenv()
+
+
+def _parse_features(features):
+    return features if isinstance(features, dict) else json.loads(features)
 
 
 def get_engine():
@@ -88,6 +95,19 @@ def insert_prediction(engine, transaction_id, batch_id, row_index, features, sco
         })
 
 
+def insert_predictions_bulk(engine, records):
+    if not records:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO predictions
+                (transaction_id, batch_id, row_index, features, score, predicted_label, model_version)
+            VALUES
+                (:transaction_id, :batch_id, :row_index, CAST(:features AS JSONB), :score, :predicted_label, :model_version)
+            ON CONFLICT (transaction_id) DO NOTHING
+        """), records)
+
+
 def get_unlabeled_predictions(engine, max_batch_id):
     with engine.connect() as conn:
         rows = conn.execute(text("""
@@ -123,7 +143,7 @@ def get_recent_predictions(engine, min_batch_id, max_batch_id=None):
 
     records = []
     for batch_id, features in rows:
-        record = dict(features)
+        record = dict(_parse_features(features))
         record["batch_id"] = batch_id
         records.append(record)
     return pd.DataFrame(records)
@@ -163,7 +183,7 @@ def get_labeled_predictions(engine, min_batch_id=None, max_batch_id=None):
 
     records = []
     for batch_id, features, true_label in rows:
-        record = dict(features)
+        record = dict(_parse_features(features))
         record["batch_id"] = batch_id
         record["true_label"] = true_label
         records.append(record)

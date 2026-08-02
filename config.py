@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 RAW_DATA_PATH = Path("data/raw/creditcard.csv")
 BATCHES_DIR = Path("data/batches")
 FROZEN_HOLDOUT_PATH = Path("data/raw/frozen_holdout.parquet")
@@ -42,3 +46,5 @@ HOLDOUT_TOLERANCE = 0.05
 GROQ_MODEL = "openai/gpt-oss-120b"
 
 RECENT_SAMPLE_WEIGHT = 3.0
+
+REPLAY_CHUNK_SIZE = 500

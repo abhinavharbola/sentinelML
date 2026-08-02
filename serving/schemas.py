@@ -20,3 +20,17 @@ class PredictionResponse(BaseModel):
     score: float
     predicted_label: int
     model_version: str
+
+
+class PredictionRow(BaseModel):
+    row_index: int
+    features: Features
+
+
+class PredictionBatchRequest(BaseModel):
+    batch_id: int
+    rows: list[PredictionRow]
+
+
+class PredictionBatchResponse(BaseModel):
+    predictions: list[PredictionResponse]
