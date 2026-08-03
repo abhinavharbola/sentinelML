@@ -172,11 +172,10 @@ uvicorn serving.main:app --reload
 
 **Reproduce a drift-triggered retrain end to end**, either locally or via `workflow_dispatch` on `monitor.yml`:
 ```
-python scripts/advance_day.py       # repeat until current_batch >= 30 to enter feature-drift batches
-python scripts/replay_batch.py      # generates real predictions in Neon
-python src/label_injector.py        # releases labels once LABEL_DELAY_BATCHES has passed
-python src/drift.py                 # should eventually report retrain_needed=true
+python scripts/fast_forward.py 25   # advance + replay + release labels, 25 simulated days at once
+python src/drift.py                 # should now report retrain_needed=true (past batch 30 = feature drift)
 ```
+`fast_forward.py` exists because doing this one `advance_day.py` call at a time to reach batch 30+ is tedious and, worse, incomplete on its own, jumping the day counter without replaying each day's traffic leaves the recent window with no predictions for `drift.py` to analyze. It runs the real `advance_day.py` → `replay_batch.py` → `label_injector.py` functions directly (not a reimplementation) for each simulated day.
 Once `drift.py` reports `retrain_needed=true`, `monitor.yml` fires `retrain.yml` automatically via `repository_dispatch`. To trigger it manually instead:
 ```
 python src/train.py
@@ -187,15 +186,3 @@ python src/promote.py promote --challenger-version <version from train.py output
 ```
 streamlit run dashboard/app.py
 ```
-
-## Known limitations
-
-- **Evidently's result schema is version-sensitive.** `drift.py` reads `report.as_dict()["metrics"][0]["result"]["share_of_drifted_columns"]`, written against Evidently 0.4.40. This key path has changed across Evidently versions before, verify it once locally if you bump the version.
-- **Groq's available models change.** `config.GROQ_MODEL` is currently `openai/gpt-oss-120b`; check Groq's model list if it starts failing.
-- **Free-tier cold starts.** Render/Hugging Face Spaces free tier spins down after inactivity, the first `/predict` after idle will be slow. Not a bug, just a demo caveat.
-- **No real live traffic, ever.** Every batch, every drift event, and every label is scripted and disclosed. Stated once here rather than repeated in every section.
-- **Rolling-window metrics are noisy by design of the dataset.** With ~0.17% fraud, small windows can produce unstable recall/precision, this is why `MIN_FRAUD_COUNT_FOR_PERF_CHECK` exists as a hard floor rather than trusting every window's numbers equally.
-
-## Out of scope (by design)
-
-No deep learning, no GPU dependency anywhere, no LLM involvement beyond the single isolated explanation call in `dashboard/llm_explain.py`, it explains a decision the deterministic pipeline already made; it never touches drift detection, training, evaluation, gating, or promotion logic.
