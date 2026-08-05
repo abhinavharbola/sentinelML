@@ -32,7 +32,7 @@ def replay(batch_id, api_url):
             for row_index, row in chunk.iterrows()
         ]
         payload = {"batch_id": batch_id, "rows": rows}
-        response = requests.post(f"{api_url}/predict_batch", json=payload, timeout=60)
+        response = requests.post(f"{api_url}/predict_batch", json=payload, timeout=120)
         response.raise_for_status()
         sent += len(rows)
 

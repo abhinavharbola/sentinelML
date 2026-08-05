@@ -16,7 +16,10 @@ from serving.schemas import PredictionBatchRequest, PredictionBatchResponse, Pre
 
 app = FastAPI(title="Fraud Detection API")
 logfire.configure()
-logfire.instrument_fastapi(app)
+try:
+    logfire.instrument_fastapi(app)
+except Exception as e:
+    print(f"logfire.instrument_fastapi failed, continuing without request-level tracing: {e}")
 
 _engine = None
 _model = None
@@ -39,7 +42,10 @@ def startup():
     mlflow.set_tracking_uri(config.MLFLOW_TRACKING_URI)
     _engine = get_engine()
     init_db(_engine)
-    logfire.instrument_sqlalchemy(engine=_engine)
+    try:
+        logfire.instrument_sqlalchemy(engine=_engine)
+    except Exception as e:
+        print(f"logfire.instrument_sqlalchemy failed, continuing without SQL-level tracing: {e}")
 
 
 @app.post("/predict", response_model=PredictionResponse)

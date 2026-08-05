@@ -14,9 +14,7 @@ def load_raw():
 
 
 def split_frozen_holdout(df):
-    holdout = df.groupby("Class", group_keys=False).apply(
-        lambda g: g.sample(frac=config.HOLDOUT_FRACTION, random_state=config.SEED)
-    )
+    holdout = df.groupby("Class", group_keys=False).sample(frac=config.HOLDOUT_FRACTION, random_state=config.SEED)
     remaining = df.drop(holdout.index).reset_index(drop=True)
     holdout = holdout.reset_index(drop=True)
     return holdout, remaining

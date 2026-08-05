@@ -141,16 +141,16 @@ Promotion also requires at least `MIN_FRAUD_COUNT_FOR_PERF_CHECK` (20) labeled f
 4. **Set up DVC against DagsHub** (one-time, local):
    ```
    dvc init
-   dvc remote modify origin --local auth basic
-   dvc remote modify origin --local user <DAGSHUB_USERNAME>
-   dvc remote modify origin --local password <DAGSHUB_TOKEN>
+   dvc remote add origin s3://dvc
+   dvc remote modify origin endpointurl https://dagshub.com/<user>/<repo>.s3
+   dvc remote modify origin --local access_key_id <DAGSHUB_USERNAME>
+   dvc remote modify origin --local secret_access_key <DAGSHUB_TOKEN>
    ```
 
 5. **Generate the simulated stream**
    ```
    python data/simulate_stream.py
    dvc add data/raw/creditcard.csv data/raw/frozen_holdout.parquet data/batches
-   dvc remote default origin
    dvc push -j 1 -v
    ```
 
@@ -163,6 +163,7 @@ Promotion also requires at least `MIN_FRAUD_COUNT_FOR_PERF_CHECK` (20) labeled f
 python src/train.py
 python src/promote.py promote --challenger-version 1
 ```
+
 The first promotion has no existing champion to compare against, so `promote.py` bootstraps unconditionally and seeds the baseline from the challenger's own holdout performance.
 
 **Serve locally:**

@@ -3,6 +3,7 @@ import os
 
 import pandas as pd
 from dotenv import load_dotenv
+from psycopg2.extras import execute_values
 from sqlalchemy import create_engine, text
 
 load_dotenv()
@@ -98,14 +99,32 @@ def insert_prediction(engine, transaction_id, batch_id, row_index, features, sco
 def insert_predictions_bulk(engine, records):
     if not records:
         return
-    with engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO predictions
-                (transaction_id, batch_id, row_index, features, score, predicted_label, model_version)
-            VALUES
-                (:transaction_id, :batch_id, :row_index, CAST(:features AS JSONB), :score, :predicted_label, :model_version)
-            ON CONFLICT (transaction_id) DO NOTHING
-        """), records)
+
+    query = """
+        INSERT INTO predictions
+            (transaction_id, batch_id, row_index, features, score, predicted_label, model_version)
+        VALUES %s
+        ON CONFLICT (transaction_id) DO NOTHING
+    """
+    values = [
+        (
+            r["transaction_id"], r["batch_id"], r["row_index"], r["features"],
+            r["score"], r["predicted_label"], r["model_version"],
+        )
+        for r in records
+    ]
+
+    raw_conn = engine.raw_connection()
+    try:
+        with raw_conn.cursor() as cursor:
+            execute_values(
+                cursor, query, values,
+                template="(%s, %s, %s, CAST(%s AS JSONB), %s, %s, %s)",
+                page_size=len(values),
+            )
+        raw_conn.commit()
+    finally:
+        raw_conn.close()
 
 
 def get_unlabeled_predictions(engine, max_batch_id):
